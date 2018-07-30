@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description"><title>(原)深度理解同步异步与阻塞非阻塞 | jupiter</title><link rel="stylesheet" type="text/css" href="/jupiter/css/style.css?v=0.0.0"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/normalize/8.0.0/normalize.min.css"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/pure/1.0.0/pure-min.css"><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/pure/1.0.0/grids-responsive-min.css"><link rel="stylesheet" href="//cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script><link rel="Shortcut Icon" type="image/x-icon" href="/jupiter/favicon.ico"><link rel="apple-touch-icon" href="/jupiter/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/jupiter/apple-touch-icon.png"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">(原)深度理解同步异步与阻塞非阻塞</h1><a id="logo" href="/jupiter/.">jupiter</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/jupiter/."><i class="fa fa-home"> 首页</i></a><a href="/jupiter/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/jupiter/about/"><i class="fa fa-user"> 关于</i></a><a href="/jupiter/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">(原)深度理解同步异步与阻塞非阻塞</h1><div class="post-meta">Jul 30, 2018</div><div class="post-content"><p>本文核心资料均来自网络。但通常孤立的网络资料总有零零碎碎之感，看完还是不通不透，浅尝辄止，觉得自己的体系拼图里总是缺少几块。<br>本人有幸在IO这个话题下找到几篇能够互相补充的资料，结合了这些资料，融进自己的理解和实现，以成此文。<br>如有不当，恳请斧正。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p><img src="1.jpg" alt="IO"></p>
+<ul>
+<li>服务器端关注同步异步，同步和异步指的是服务器如何处理消息通知的机制。</li>
+<li>客户端关注阻塞非阻塞，阻塞和非阻塞指的是程序(调用者/客户端)在等待调用结果(消息通知)时的状态。</li>
+</ul>
+<h2 id="厘清概念"><a href="#厘清概念" class="headerlink" title="厘清概念"></a>厘清概念</h2><h3 id="经典解释1-《书店买书》"><a href="#经典解释1-《书店买书》" class="headerlink" title="经典解释1 《书店买书》"></a>经典解释1 《书店买书》</h3><p>你打电话问书店老板有没有《分布式系统》这本书</p>
+<ol>
+<li><p>同步与异步</p>
+<ul>
+<li>同步<br>  如果是同步通信机制，书店老板会说，你稍等，“我查一下”，然后开始查啊查，等查好了（可能是5秒，也可能是一天）告诉你结果（返回结果）。</li>
+<li>异步<br>  书店老板直接告诉你我查一下啊，查好了打电话给你，然后直接挂电话了（不返回结果）。然后查好了，他会主动打电话给你。在这里老板通过“回电”这种方式来回调。</li>
+</ul>
+</li>
+<li><p>阻塞与非阻塞</p>
+<ul>
+<li>阻塞<br>  你打电话问书店老板有没有《分布式系统》这本书，你如果是阻塞式调用，你会一直把自己“挂起”，直到得到这本书有没有的结果。</li>
+<li>非阻塞<br>  如果是非阻塞式调用，你不管老板有没有告诉你，你自己先一边去玩了，当然你也要偶尔过几分钟check一下老板有没有返回结果。<br>  在这里阻塞与非阻塞与是否同步异步无关。跟老板通过什么方式回答你结果无关。</li>
+</ul>
+</li>
+</ol>
+<h3 id="经典解释2-《叫外卖》"><a href="#经典解释2-《叫外卖》" class="headerlink" title="经典解释2 《叫外卖》"></a>经典解释2 《叫外卖》</h3><p>《unix网络编程》里总结了五类IO模型。为了更好地理解，我举一个叫外卖的例子来说明。</p>
+<ol>
+<li><p>完全阻塞模型<br> 如果客户端发起了connect请求，那么当前线程就会休眠，等待服务端响应完毕，返回消息，才会继续走下去。<br><img src="io1.jpg" alt=""></p>
+ <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">socketChannel = SocketChannel.open();</span><br><span class="line">socketChannel.connect(<span class="keyword">new</span> InetSocketAddress(<span class="string">"192.168.0.13"</span>, <span class="number">8000</span>));</span><br><span class="line">System.out.println(<span class="string">"Hello"</span>);</span><br></pre></td></tr></table></figure>
+<p> 在connect没有完成之前，最后第三行的println根本不会执行。也就是说客户端会阻塞在这个地方。</p>
+<p> 就好比，我叫个外卖，然后我就去大门口傻等着，外卖不送到，我也什么都不做，就坐在门口打盹，直到外卖小哥过来，把我叫醒，我才拿着外卖回家去吃。这样做显然效率不高，显得脑子有水。</p>
+</li>
+<li><p>非阻塞式IO模型<br> 把非阻塞的文件描述符称为非阻塞I/O。可以通过设置SOCK_NONBLOCK标记创建非阻塞的socket fd，或者使用fcntl将fd设置为非阻塞。<br><img src="io2.jpg" alt=""><br> 就是说，客户端程序会不停地去尝试读取数据，但是不会阻塞在那个读方法里，如果读的时候，没有读到内容，也会立即返回。这就允许我们在客户端里，读到不数据的时候可以搞点其他的事情了。</p>
+<p> 仍然以外卖举例，就相当于，我一边扫地，一边等外卖。我不再像原来一样，在门口傻等了，而是扫两下，就跑到门口看看外卖到了没有。一直这样循环，直到我取到外卖，才从这个循环中跳出来，进入吃的流程。</p>
+</li>
+<li><p>IO多路复用模型<br> 还是外卖的例子，如果我们整栋楼的人，很多人叫了外卖，都有下楼来看外卖到没到的需求，于是物业就出了个招，让门卫小哥帮大家看着，整栋楼上的，不管是谁的外卖到了，先放到门卫小哥那里，然后门卫小哥再通知你下来拿自己的外卖。这样一来，我们就把本来多个人要跑去看自己的外卖到了这件事交给门卫小哥去做了。而我们解放出来，就可以继续看电视，打扫卫生，刷知乎了。由于我们可以继续 做自己的事情，外卖小哥和门卫小哥在同时也在工作，互不干扰，所以这种工作方式就被称为<code>(伪)异步模型</code>。<br> * (注) 原文这里写的是异步模型，与另一资料(也就是本文顶部的结论图)冲突，经过整合，我标注这里为伪异步。那么，问题来了，为什么这是伪异步，他和真异步的区别又是什么？下文解析。<br><img src="io3.jpg" alt=""></p>
+<p> 最常用的I/O事件通知机制就是I/O复用(I/O multiplexing)。<br> Linux环境中使用<code>select/poll/epoll_wait</code>实现I/O复用，I/O复用接口本身是阻塞的，在应用程序中通过I/O复用接口向内核注册fd所关注的事件，当关注事件触发时，通过I/O复用接口的返回值通知到应用程序。I/O复用接口可以同时监听多个I/O事件以提高事件处理效率。</p>
+</li>
+<li><p>SIGIO模型<br> 除了I/O复用方式通知I/O事件，还可以通过SIGIO信号来通知I/O事件，如图所示。两者不同的是，在等待数据达到期间，I/O复用是会阻塞应用程序，而SIGIO方式是不会阻塞应用程序的。<br><img src="io4.jpg" alt=""><br> 上面这张图，就是我们现实生活中真正的外卖。数据到达以后，给客户端发一个消息，让客户端过来取数据。这就像外卖小哥到你家门口给你打电话，让你出来取一下。显然，这种是最方便的，也是最合理的。</p>
+</li>
+<li><p>纯异步模型<br> <code>POSIX规范</code>定义了一组异步操作I/O的接口，不用关心fd 是阻塞还是非阻塞，异步I/O是由内核接管应用层对fd的I/O操作。异步I/O向应用层通知I/O操作完成的事件，这与前面介绍的I/O复用模型、SIGIO模型通知事件就绪的方式明显不同。以aio_read实现异步读取IO数据为例，如图所示，在等待I/O操作完成期间，不会阻塞应用程序。<br><img src="io5.jpg" alt=""><br> 这个图，如果对应到外卖有点不合适了，比较像网购空调，我所要做的，只是下单，而快递小哥会把空调送过来，他也不会让你自己去取，他会让安装师傅直接帮你安装。这个过程中，你什么都不需要做。你所要做的仅仅是发起一个请求。这种IO模型就是纯正的异步IO。</p>
+<p> 这种纯异步IO的最典型例子就是node.js中的callback。<br> 延伸阅读 <a href="https://www.cnblogs.com/chenyangyao/p/libuv_threadpool.html" target="_blank" rel="noopener">Nodejs全异步事件引擎libuv源码剖析之：高效线程池(threadpool)的实现</a><br> 这5种IO并不是相互对立的，通过一定的技巧，是可以相互转化的。</p>
+</li>
+<li><p>5个IO模型的区别<br><img src="grid.png" alt=""><br><img src="compare.png" alt=""></p>
+</li>
+</ol>
+<h3 id="上述总结"><a href="#上述总结" class="headerlink" title="上述总结"></a>上述总结</h3><ol>
+<li>服务器端关注同步异步，同步和异步指的是服务器如何处理消息通知的机制。</li>
+<li>客户端关注阻塞非阻塞，阻塞和非阻塞指的是程序(调用者/客户端)在等待调用结果(消息通知)时的状态。</li>
+</ol>
+<h3 id="通俗解释"><a href="#通俗解释" class="headerlink" title="通俗解释"></a>通俗解释</h3><ol>
+<li>如果服务器没有通知(也就是说没有异步机制)，客户端只能干等(阻塞/挂起)或者自己每过几分钟询问一下(非阻塞/轮询)。</li>
+<li>如果服务器有通知(有异步机制)，客户端直接不用傻等了(因此异步中通常不存在阻塞)。</li>
+</ol>
+<h2 id="撸袖实践"><a href="#撸袖实践" class="headerlink" title="撸袖实践"></a>撸袖实践</h2><ol>
+<li><p>业界分别在什么典型产品上用到了上述模型？</p>
+<ol>
+<li>IO多路复用模型<br> 延伸阅读 <a href="http://ju.outofmemory.cn/entry/346601" target="_blank" rel="noopener">Java 9、Spring Boot 2.0、HTTP/2</a></li>
+<li>纯异步模型<br> 延伸阅读 <a href="https://blog.csdn.net/xyang81/article/details/51502766" target="_blank" rel="noopener">Tomcat APR纯异步模式</a></li>
+</ol>
+</li>
+<li><p>分别实现一个伪异步和真异步程序</p>
+</li>
+</ol>
+<p><a href="https://zhuanlan.zhihu.com/p/27382996" target="_blank" rel="noopener">IO模型</a><br><a href="https://www.cnblogs.com/Anker/p/5965654.html" target="_blank" rel="noopener">关于同步、异步与阻塞、非阻塞的理解</a><br><a href="https://www.zhihu.com/question/19732473/answer/20851256" target="_blank" rel="noopener">怎样理解阻塞非阻塞与同步异步的区别？</a><br><a href="https://www.cnblogs.com/LittleHann/p/3897910.html" target="_blank" rel="noopener">Linux Network IO Model、Socket IO Model - select、poll、epoll</a><br><a href="https://blog.csdn.net/bpingchang/article/details/51419890" target="_blank" rel="noopener">聊聊 Linux 中的五种 IO 模型</a></p>
+</div><div class="tags"></div><div class="post-nav"><a class="next" href="/jupiter/2018/07/28/Edward-Snowden-The-Untold-Story-WIRED/">Edward Snowden: The Untold Story | WIRED</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="https://g29times.github.io/jupiter"/></form></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/07/30/彻底理解同步异步与阻塞非阻塞/">(原)深度理解同步异步与阻塞非阻塞</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/07/28/Edward-Snowden-The-Untold-Story-WIRED/">Edward Snowden: The Untold Story | WIRED</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/07/19/内存的工作原理及时序介绍/">(转)内存的工作原理及时序介绍</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/07/18/Jpa-CascadeType-详解/">(转)Jpa CascadeType 详解</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/26/Spring多种AOP拦截方式区别/">(原)Spring多种AOP拦截方式区别</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/25/什么是P问题、NP问题和NPC问题/">(转)什么是P问题、NP问题和NPC问题</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/19/分布式用户认证方案汇总/">(原)分布式用户认证方案汇总</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/17/MySQL-配置优化/">(转)MySQL 配置优化</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/16/Windows使用Hexo管理GitPage/">(原)Windows使用Hexo管理GitPage</a></li><li class="post-list-item"><a class="post-list-link" href="/jupiter/2018/06/15/JAVA技术体系-1/">(转)JAVA技术体系-1</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div><ul></ul><a href="http://www.example1.com/" title="site-name1" target="_blank">site-name1</a><ul></ul><a href="http://www.example2.com/" title="site-name2" target="_blank">site-name2</a><ul></ul><a href="http://www.example3.com/" title="site-name3" target="_blank">site-name3</a></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2018 <a href="/jupiter/." rel="nofollow">jupiter.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/jupiter/js/totop.js?v=0.0.0" async></script><script type="text/javascript" src="//cdn.bootcss.com/fancybox/3.3.5/jquery.fancybox.min.js" async></script><script type="text/javascript" src="/jupiter/js/fancybox.js?v=0.0.0" async></script><link rel="stylesheet" type="text/css" href="//cdn.bootcss.com/fancybox/3.3.5/jquery.fancybox.min.css"><script type="text/javascript" src="/jupiter/js/codeblock-resizer.js?v=0.0.0"></script><script type="text/javascript" src="/jupiter/js/smartresize.js?v=0.0.0"></script></div></body></html>
